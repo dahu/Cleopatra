@@ -1,0 +1,75 @@
+Cleopatra
+---------
+
+__Handle Marks like a Queen__
+
+Cleopatra is a Vim plugin for managing and navigating around file
+local marks. It employs a tree-like hierarchical marks management
+philosophy that maps more intuitively to a keyboard than alphabetic
+marks do. The mark maps are user adjustable through configuration,
+catering for non-qwerty or plain freaky layouts.
+
+It employs a side-bar sibling window (like Tagbar), displaying the
+marks tree.
+
+.Mockup of Cleopatra marks tree:
+----
+ mark line  text
+ q      41  function! vimpeg#parser(options) abort
+  a    123  func peg.Expression.matcher(input) dict  abort"{{{3
+   z   128  let ends[0] = match(a:input.str, '\m'.self.pat, a:input.pos)
+   x   146  let self.value = strpart(a:input.str, ends[0], ends[1] - ends[0])
+  s    160  func peg.Expression.match(input) dict "{{{3
+  d    168  func peg.Expression.pmatch(input) dict  abort"{{{3
+  f    184  func! peg.ExpressionSequence.new(seq, ...) dict  abort"{{{3
+  g    193  func! peg.ExpressionSequence.matcher(input) dict  abort"{{{3
+*  c   199  for s in self.seq
+----
+
+[NOTE]
+====
+
+* The line numbers are in order. I can't at this stage imagine a case
+  where they wouldn't be. I might have a poor imagination. Feedback
+  welcome.
+
+* The line text is shown in full here, but will be neatly truncated to
+  fit within the width of the marks tree window.
+
+* The `*` indicates where the cursor currently is. If the cursor is
+  somewhere between marks `g` and `c` then the display would show
+  instead:
++
+----
+  ...
+  g    193  func! peg.ExpressionSequence.matcher(input) dict  abort"{{{3
+*
+   c   199  for s in self.seq
+----
+
+====
+
+.Control Interface
+
+Cleopatra uses a three tier hierarchy for marks placement:
+
+* outer (class) level
+
+* middle (function) level
+
+* and inner (block) level.
+
+.Commands exist for:
+
+* placing/removing each type of mark at the cursor
+
+* cycling between next/previous mark at each of the levels
+
+* showing/hiding the marks tree (as shown above)
+
+.Navigation from within the Marks Tree Viewer:
+
+Moving your cursor in the marks tree view will update your cursor
+position in the associated window, making it easy to quickly move up
+and down the hierarchy of the file, or the hierarchy you marked within
+it.
