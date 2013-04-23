@@ -49,7 +49,7 @@ if !exists('g:cleopatra_left')
 endif
 
 if !exists('g:cleopatra_width')
-  let g:cleopatra_width = 20
+  let g:cleopatra_width = 10
 endif
 
 if !exists('g:cleopatra_autoclose')
@@ -103,6 +103,20 @@ if exists('g:cleopatra_engines')
         \ '? extend(s:engines[v:key], g:cleopatra_engines[v:key], "force")'.
         \ ': v:val')
 endif
+
+
+" Sort the vimple#marks by line number
+function! Linely(i, j)
+  let i = str2nr(a:i.line)
+  let j = str2nr(a:j.line)
+  return i == j ? 0 : i > j ? 1 : -1
+endfunction
+
+function! CleoMarks()
+  let marks = g:vimple#ma.update().local_marks().to_l()
+  call sort(marks, 'Linely')
+  return marks
+endfunction
 
 " s:CreateAutocommands() {{{2
 function! s:CreateAutocommands()
