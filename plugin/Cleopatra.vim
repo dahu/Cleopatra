@@ -49,7 +49,7 @@ if !exists('g:cleopatra_left')
 endif
 
 if !exists('g:cleopatra_width')
-  let g:cleopatra_width = 10
+  let g:cleopatra_width = 20
 endif
 
 if !exists('g:cleopatra_autoclose')
@@ -64,45 +64,11 @@ if !exists('g:cleopatra_expand')
   let g:cleopatra_expand = 0
 endif
 
-let s:snippets_init_done    = 0
+" TODO: check if we have vimple
+let s:vimple_init_done      = 0
 let s:autocommands_done     = 0
+let s:source_autocommands_done = 0
 let s:window_expanded       = 0
-let s:snippets              = []
-
-" From :help <SID>
-function s:SID()
-  return matchstr(expand('<sfile>'), '<SNR>\d\+_\zeSID$')
-endfun
-
-let s:engines = {
-      \ 'snipmate': {
-      \   'detect': 'exists("g:loaded_snips")',
-      \   'list_func': 'snipMate#GetSnippetsForWordBelowCursor',
-      \   'list_func_args': 'a:word,"*",0',
-      \   'list_map': 'v:val[0]'
-      \   },
-      \ 'xptemplate': {
-      \   'detect': 'exists(''g:__XPTEMPLATE_VIM__'')',
-      \   'list_func': s:SID().'xptemplate_helper',
-      \   'list_func_args': 'a:word'
-      \   },
-      \ 'ultisnips': {
-      \   'detect': 'exists(''g:did_UltiSnips_vim'')',
-      \   'list_func': s:SID().'ultisnips_helper',
-      \   'list_func_args': 'a:word'
-      \   }
-      \ }
-
-" TODO: Should we allow only one engine?
-if exists('g:cleopatra_engines')
-  " Add extra entries
-  call extend(s:engines, g:cleopatra_engines, 'keep')
-  " Merge common entries
-  call map(s:engines,
-        \ 'has_key(g:cleopatra_engines, v:key)'.
-        \ '? extend(s:engines[v:key], g:cleopatra_engines[v:key], "force")'.
-        \ ': v:val')
-endif
 
 
 " Sort the vimple#marks by line number
@@ -112,10 +78,49 @@ function! Linely(i, j)
   return i == j ? 0 : i > j ? 1 : -1
 endfunction
 
-function! CleoMarks()
+let s:mark_placement = {
+      \ 'outer'  : '%s  ',
+      \ 'middle' : ' %s ',
+      \ 'inner'  : '  %s'}
+
+" TODO: these need to be updated as the user issues
+" :CleoMark <outer|middle|inner> on lines within the buffer.
+" TODO: what marks a buffer considres to be in those three sets needs to be
+" persisted
+
+let s:mark_hierarchy = {
+      \ 'outer'  : 'qwerty',
+      \ 'middle' : 'asdfghjkl',
+      \ 'inner'  : 'zxcvbnmpoiuy'}
+
+function! CleoMarkHiercharchy(mark)
+  return printf(
+        \ s:mark_placement[keys(
+        \   filter(copy(s:mark_hierarchy), 'v:val =~ "' . a:mark . '"')
+        \ )[0]],
+        \ a:mark)
+endfunction
+
+function! CleoMarks(cursor_line)
   let marks = g:vimple#ma.update().local_marks().to_l()
-  call sort(marks, 'Linely')
-  return marks
+  " Locate the cursor line within the marks
+  " 1. does it fall on a mark?
+  call map(marks, 'v:val["line"] == ' . a:cursor_line . ' ? extend(v:val, {"cursor" : ""}) : v:val')
+  if len(filter(copy(marks), 'has_key(v:val, "cursor")')) == 0
+    " 2. where does it fall between marks?
+    " 0  == before all marks
+    " -1 == after all marks
+    " positive integer == the index of the cursor line
+    let cursor_index = index(map(sort(map(copy(marks), 'v:val["line"]')),
+          \ 'v:val == min([v:val, 306])'), 0)
+    call insert(marks,
+          \ {'cursor' : '', 'line' : a:cursor_line, 'mark' : '', 'text' : ''},
+          \ cursor_index)
+  endif
+  return map(sort(marks, 'Linely'),
+        \ 'printf("%1s %3s %4d %s", has_key(v:val, "cursor") ? "*" : "",
+        \ CleoMarkHiercharchy(v:val["mark"]),
+        \ v:val["line"], v:val["text"])')
 endfunction
 
 " s:CreateAutocommands() {{{2
@@ -126,13 +131,24 @@ function! s:CreateAutocommands()
               \ call s:QuitIfOnlyWindow()
         autocmd BufUnload  __Cleopatra__
               \ call s:CleanUp()
+        " TODO: What is b:did_xpt ?
         autocmd FileType   *
               \ unlet! b:did_xpt
-        autocmd CursorMovedI *
+        autocmd CursorMoved __Cleopatra__
               \ call s:AutoUpdate()
     augroup END
 
     let s:autocommands_done = 1
+endfunction
+
+" s:CreateSourceAutocommands() {{{2
+function! s:CreateSourceAutocommands()
+  augroup CleopatraSourceAutoCmds
+    autocmd!
+    autocmd CursorMoved <buffer>
+          \ call s:SourceAutoUpdate()
+  augroup END
+  let s:source_autocommands_done = 1
 endfunction
 
 " s:MapKeys() {{{2
@@ -167,21 +183,16 @@ endfunction
 
 " s:OpenWindow() {{{2
 function! s:OpenWindow(autoclose)
-  call s:set_engine()
-  if !exists('s:engine')
-    " XXX There is nothing to show.
-    echohl ErrorMsg
-    echom 'Cleopatra could not find a snippets engine!'
-    echohl None
-    return
-  endif
   " If the cleopatra window is already open jump to it
   let cleopatrawinnr = bufwinnr('__Cleopatra__')
   if cleopatrawinnr != -1
     if winnr() != cleopatrawinnr
+      let t:cleo_marks = CleoMarks(line('.'))
       execute cleopatrawinnr . 'wincmd w'
     endif
     return
+  else
+    let t:cleo_marks = CleoMarks(line('.'))
   endif
 
   " Expand the Vim window to accomodate for the Cleopatra window if requested
@@ -192,10 +203,14 @@ function! s:OpenWindow(autoclose)
 
   let openpos = g:cleopatra_left ? 'topleft vertical ' : 'botright vertical '
   exe 'silent keepalt ' . openpos . g:cleopatra_width . 'split ' . '__Cleopatra__'
-
   call s:InitWindow(a:autoclose)
 
   execute 'wincmd p'
+
+  " TODO: need a better name for this, or a better way to do it
+  if !s:source_autocommands_done
+    call s:CreateSourceAutocommands()
+  endif
 
   "" Jump back to the cleopatra window if autoclose or autofocus is set. Can't
   "" just stay in it since it wouldn't trigger the update event
@@ -252,6 +267,8 @@ function! s:InitWindow(autoclose)
   if !s:autocommands_done
     call s:CreateAutocommands()
   endif
+
+  call s:RenderContent()
 
   let &cpoptions = cpoptions_save
 endfunction
@@ -313,13 +330,14 @@ endfunction
 
 " Display {{{1
 " s:RenderContent() {{{2
-function! s:RenderContent(word)
+function! s:RenderContent()
   let cleopatrawinnr = bufwinnr('__Cleopatra__')
 
   if &filetype == 'cleopatra'
     let in_cleopatra = 1
   else
     let in_cleopatra = 0
+    let t:cleo_marks = CleoMarks(line('.'))
     let prevwinnr = winnr()
     execute cleopatrawinnr . 'wincmd w'
   endif
@@ -333,7 +351,7 @@ function! s:RenderContent(word)
 
   silent %delete _
 
-  call s:PrintSnippets()
+  call s:PrintMarks()
 
   setlocal nomodifiable
 
@@ -350,58 +368,14 @@ function! s:RenderContent(word)
 endfunction
 
 " s:PrintSnippets {{{2
-function! s:PrintSnippets()
-  silent put =s:snippets
+function! s:PrintMarks()
+  call setline(1, t:cleo_marks)
 endfunction
 
 "
 " User Actions {{{1
 
 " Helper Functions {{{1
-
-" s:ultisnips_helper() {{{2
-function! s:ultisnips_helper(word)
-  exec "py vim.command('let snippets = \\'' + str(UltiSnips_Manager._snips('".a:word."', True)) + '\\'')"
-  let snippets = substitute(snippets, 'Snippet(\([^,]\+\)\%("\%(\\.\|[^\\"]\)*"\|[^"]\)\{-})\(,\s*\)\?','\1\2', 'g')
-  return sort(split(snippets[1:-2],',\s*'))
-endfunction
-
-" s:xptemplate_helper() {{{2
-function! s:xptemplate_helper(word)
-  if !exists('b:did_xpt')
-    call XPTparseSnippets()
-    let b:did_xpt = 1
-  endif
-  return sort(filter(keys(b:xptemplateData.filetypes[&filetype].allTemplates), 'v:val !~ ''\W\|^_'' && v:val =~? "^".a:word'))
-endfunction
-
-" s:set_engine() {{{2
-function! s:set_engine()
-  if exists('g:cleopatra_engine')
-    let s:engine = s:engines[tolower(g:cleopatra_engine)]
-  else
-    for key in keys(s:engines)
-      if eval(s:engines[key].detect)
-        let s:engine = s:engines[key]
-        let s:engine.name = key
-        break
-      endif
-    endfor
-  endif
-  if !exists('s:engine')
-    "TODO: What to do here?
-    echohl ErrorMsg
-    echom 'Cleopatra: No snippet engine was found!'
-    echohl None
-  else
-    if !has_key(s:engine, 'pattern')
-      let s:engine.pattern = '\W\zs\w\+\%#'
-    endif
-    if !has_key(s:engine, 'list_func_args')
-      let s:engine.list_func_args = ''
-    endif
-  endif
-endfunction
 
 " s:CleanUp() {{{2
 function! s:CleanUp()
@@ -426,29 +400,28 @@ function! s:QuitIfOnlyWindow()
     endif
 endfunction
 
+" TODO: This needs to update the source window to reflect the current cursor
+" position within the Cleopatra window
 " s:AutoUpdate() {{{2
 function! s:AutoUpdate()
+  " " Don't do anything if cleopatra is not open or if we're in the cleopatra window
+  " let cleopatrawinnr = bufwinnr('__Cleopatra__')
+  " if cleopatrawinnr == -1 || &filetype == 'cleopatra'
+  "   return
+  " endif
+
+  " call s:RenderContent()
+endfunction
+
+" s:SourceAutoUpdate() {{{2
+function! s:SourceAutoUpdate()
   " Don't do anything if cleopatra is not open or if we're in the cleopatra window
   let cleopatrawinnr = bufwinnr('__Cleopatra__')
   if cleopatrawinnr == -1 || &filetype == 'cleopatra'
     return
   endif
 
-  let p = searchpos(s:engine.pattern, 'bnW')
-  let word = strpart(getline('.'), p[1]-1, col('.')-p[1])
-  call s:Snippets(word)
-
-  call s:RenderContent(word)
-endfunction
-
-" s:Snippets(word) {{{2
-function! s:Snippets(word)
-  let args = eval('['.s:engine.list_func_args.']')
-  let s:snippets = call(s:engine.list_func, args)
-  if has_key(s:engine, 'list_map')
-    call map(s:snippets, s:engine.list_map)
-    "echom 'map'
-  endif
+  call s:RenderContent()
 endfunction
 
 " Commands {{{1
