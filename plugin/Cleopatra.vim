@@ -131,9 +131,6 @@ function! s:CreateAutocommands()
               \ call s:QuitIfOnlyWindow()
         autocmd BufUnload  __Cleopatra__
               \ call s:CleanUp()
-        " TODO: What is b:did_xpt ?
-        autocmd FileType   *
-              \ unlet! b:did_xpt
         autocmd CursorMoved __Cleopatra__
               \ call s:AutoUpdate()
     augroup END
