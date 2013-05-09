@@ -113,9 +113,12 @@ function! CleoMarks(cursor_line)
     " positive integer == the index of the cursor line
     let cursor_index = index(map(sort(map(copy(marks), 'v:val["line"]')),
           \ 'v:val == min([v:val, 306])'), 0)
-    call insert(marks,
-          \ {'cursor' : '', 'line' : a:cursor_line, 'mark' : '', 'text' : ''},
-          \ cursor_index)
+
+    if cursor_index != -1
+      call insert(marks,
+            \ {'cursor' : '', 'line' : a:cursor_line, 'mark' : '', 'text' : ''},
+            \ cursor_index)
+    endif
   endif
   return map(sort(marks, 'Linely'),
         \ 'printf("%1s %3s %4d %s", has_key(v:val, "cursor") ? "*" : "",
