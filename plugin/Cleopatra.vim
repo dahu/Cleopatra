@@ -101,6 +101,10 @@ function! CleoMarkHiercharchy(mark)
         \ a:mark)
 endfunction
 
+function! Numerically(i1, i2)
+  return a:i1 - a:i2
+endfunction
+
 function! CleoMarks(cursor_line)
   let marks = g:vimple#ma.update().local_marks().to_l()
   " Locate the cursor line within the marks
@@ -111,8 +115,12 @@ function! CleoMarks(cursor_line)
     " 0  == before all marks
     " -1 == after all marks
     " positive integer == the index of the cursor line
-    let cursor_index = index(map(sort(map(copy(marks), 'v:val["line"]')),
-          \ 'v:val == min([v:val, 306])'), 0)
+    if len(marks) == 0
+      let cursor_index = 0
+    else
+      let cursor_index = index(map(sort(map(copy(marks), 'v:val["line"]'), 'Numerically'),
+            \ 'v:val == min([v:val,' . a:cursor_line . '])'), 0)
+    endif
     call insert(marks,
           \ {'cursor' : '', 'line' : a:cursor_line, 'mark' : '', 'text' : ''},
           \ cursor_index)
@@ -125,17 +133,17 @@ endfunction
 
 " s:CreateAutocommands() {{{2
 function! s:CreateAutocommands()
-    augroup CleopatraAutoCmds
-        autocmd!
-        autocmd BufEnter   __Cleopatra__ nested
-              \ call s:QuitIfOnlyWindow()
-        autocmd BufUnload  __Cleopatra__
-              \ call s:CleanUp()
-        autocmd CursorMoved __Cleopatra__
-              \ call s:AutoUpdate()
-    augroup END
+  augroup CleopatraAutoCmds
+    autocmd!
+    autocmd BufEnter   __Cleopatra__ nested
+          \ call s:QuitIfOnlyWindow()
+    autocmd BufUnload  __Cleopatra__
+          \ call s:CleanUp()
+    autocmd CursorMoved __Cleopatra__
+          \ call s:AutoUpdate()
+  augroup END
 
-    let s:autocommands_done = 1
+  let s:autocommands_done = 1
 endfunction
 
 " s:CreateSourceAutocommands() {{{2
@@ -151,13 +159,13 @@ endfunction
 " s:MapKeys() {{{2
 function! s:MapKeys()
   "nnoremap <script> <silent> <buffer> <CR>
-        "\ :call <SID>InsertSnippet()<CR>
+  "\ :call <SID>InsertSnippet()<CR>
   "nnoremap <script> <silent> <buffer> <2-LeftMouse>
-        "\ :call <SID>InsertSnippet()<CR>
+  "\ :call <SID>InsertSnippet()<CR>
   "nnoremap <script> <silent> <buffer> <LeftRelease> <LeftRelease>
-        "\ :call <SID>CheckMouseClick()<CR>
+  "\ :call <SID>CheckMouseClick()<CR>
   "nnoremap <script> <silent> <buffer> <Space>
-        "\ :call <SID>ShowSnippetExpansion()<CR>
+  "\ :call <SID>ShowSnippetExpansion()<CR>
 
   nnoremap <script> <silent> <buffer> q    :call <SID>CloseWindow()<CR>
 endfunction
@@ -352,7 +360,7 @@ function! s:RenderContent()
 
   setlocal nomodifiable
 
- " Do we need this?
+  " Do we need this?
   execute 1
   call winline()
 
@@ -376,25 +384,25 @@ endfunction
 
 " s:CleanUp() {{{2
 function! s:CleanUp()
-    silent autocmd! CleopatraAutoCmds
+  silent autocmd! CleopatraAutoCmds
 
-    unlet s:is_maximized
-    unlet s:compare_typeinfo
+  unlet s:is_maximized
+  unlet s:compare_typeinfo
 endfunction
 
 " s:QuitIfOnlyWindow() {{{2
 function! s:QuitIfOnlyWindow()
-    " Before quitting Vim, delete the cleopatra buffer so that
-    " the '0 mark is correctly set to the previous buffer.
-    if winbufnr(2) == -1
-        " Check if there is more than one tab page
-        if tabpagenr('$') == 1
-            bdelete
-            quit
-        else
-            close
-        endif
+  " Before quitting Vim, delete the cleopatra buffer so that
+  " the '0 mark is correctly set to the previous buffer.
+  if winbufnr(2) == -1
+    " Check if there is more than one tab page
+    if tabpagenr('$') == 1
+      bdelete
+      quit
+    else
+      close
     endif
+  endif
 endfunction
 
 " TODO: This needs to update the source window to reflect the current cursor
