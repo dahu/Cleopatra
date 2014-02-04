@@ -60,15 +60,19 @@ if !exists('g:cleopatra_compact')
     let g:cleopatra_compact = 0
 endif
 
+if !exists('g:cleopatra_minify')
+    let g:cleopatra_minify = 1
+endif
+
 if !exists('g:cleopatra_expand')
   let g:cleopatra_expand = 0
 endif
 
 " TODO: check if we have vimple
-let s:vimple_init_done      = 0
-let s:autocommands_done     = 0
+let s:vimple_init_done         = 0
+let s:autocommands_done        = 0
 let s:source_autocommands_done = 0
-let s:window_expanded       = 0
+let s:window_expanded          = 0
 
 
 " Sort the vimple#marks by line number
@@ -91,7 +95,7 @@ let s:mark_placement = {
 let s:mark_hierarchy = {
       \ 'outer'  : 'qwerty',
       \ 'middle' : 'asdfghjkl',
-      \ 'inner'  : 'zxcvbnmpoiuy'}
+      \ 'inner'  : 'zxcvbnmuiop'}
 
 function! CleoMarkHiercharchy(mark)
   return printf(
@@ -128,7 +132,17 @@ function! CleoMarks(cursor_line)
   return map(sort(marks, 'Linely'),
         \ 'printf("%1s %3s %4d %s", has_key(v:val, "cursor") ? "*" : "",
         \ CleoMarkHiercharchy(v:val["mark"]),
-        \ v:val["line"], v:val["text"])')
+        \ v:val["line"], s:MinifyText(v:val["text"]))')
+endfunction
+
+function! s:MinifyText(text)
+  if g:cleopatra_minify
+    return substitute(
+          \ substitute(a:text, '\C\<\([a-z]\)[a-z]\+', '\1', 'g'),
+          \ '\C[A-Z]\zs[a-z]\+', '', 'g')
+  else
+    return a:text
+  endif
 endfunction
 
 " s:CreateAutocommands() {{{2
@@ -158,16 +172,15 @@ endfunction
 
 " s:MapKeys() {{{2
 function! s:MapKeys()
-  "nnoremap <script> <silent> <buffer> <CR>
-  "\ :call <SID>InsertSnippet()<CR>
-  "nnoremap <script> <silent> <buffer> <2-LeftMouse>
-  "\ :call <SID>InsertSnippet()<CR>
-  "nnoremap <script> <silent> <buffer> <LeftRelease> <LeftRelease>
-  "\ :call <SID>CheckMouseClick()<CR>
-  "nnoremap <script> <silent> <buffer> <Space>
-  "\ :call <SID>ShowSnippetExpansion()<CR>
-
+  nnoremap <script> <silent> <buffer> <CR> :wincmd p<cr>
+  nnoremap <script> <silent> <buffer> m    :call <SID>ToggleMinify()<CR>
   nnoremap <script> <silent> <buffer> q    :call <SID>CloseWindow()<CR>
+endfunction
+
+" TODO: Currently only reflects toggle after leaving & entering Cleo window
+function! s:ToggleMinify()
+  let g:cleopatra_minify = !g:cleopatra_minify
+  call s:RenderContent()
 endfunction
 
 
@@ -360,9 +373,9 @@ function! s:RenderContent()
 
   setlocal nomodifiable
 
-  " Do we need this?
-  execute 1
-  call winline()
+  " Open Cleo window with cursor on paired window's current line
+  1
+  call search('^\*')
 
   let &lazyredraw  = lazyredraw_save
   let &eventignore = eventignore_save
@@ -372,7 +385,7 @@ function! s:RenderContent()
   endif
 endfunction
 
-" s:PrintSnippets {{{2
+" s:PrintMarks {{{2
 function! s:PrintMarks()
   call setline(1, t:cleo_marks)
 endfunction
@@ -409,13 +422,21 @@ endfunction
 " position within the Cleopatra window
 " s:AutoUpdate() {{{2
 function! s:AutoUpdate()
-  " " Don't do anything if cleopatra is not open or if we're in the cleopatra window
-  " let cleopatrawinnr = bufwinnr('__Cleopatra__')
-  " if cleopatrawinnr == -1 || &filetype == 'cleopatra'
-  "   return
-  " endif
-
-  " call s:RenderContent()
+  " Don't do anything if cleopatra is not open or if we're in the cleopatra window
+  let cleopatrawinnr = bufwinnr('__Cleopatra__')
+  if cleopatrawinnr == -1
+    return
+  endif
+  if &filetype == 'cleopatra'
+    let line = getline('.')
+    let line_num = matchstr(line, ' \zs\d\+')
+    wincmd p
+    exe 'normal ' . line_num . 'Gzz'
+    redraw
+    wincmd p
+  else
+    call s:RenderContent()
+  endif
 endfunction
 
 " s:SourceAutoUpdate() {{{2
@@ -429,11 +450,17 @@ function! s:SourceAutoUpdate()
   call s:RenderContent()
 endfunction
 
+" Maps {{{1
+nnoremap <leader>cc :CleopatraToggle<CR>:wincmd p<CR>
+
 " Commands {{{1
 command! -nargs=0 CleopatraToggle        call s:ToggleWindow()
 command! -nargs=0 CleopatraOpen          call s:OpenWindow(0)
 command! -nargs=0 CleopatraOpenAutoClose call s:OpenWindow(1)
 command! -nargs=0 CleopatraClose         call s:CloseWindow()
+" TODO: add complete="outer,middle,inner"
+command! -nargs=1 CleopatraMarkLine      call s:CleoMarkLine(<q-args>)
+command! -nargs=0 CleopatraUnmarkLine    call s:CleoUnmarkLine()
 
 " Modeline {{{1
 " vim: ts=8 sw=2 sts=2 et foldenable foldmethod=marker foldcolumn=1
