@@ -349,6 +349,10 @@ endfunction
 " Display {{{1
 " s:RenderContent() {{{2
 function! s:RenderContent()
+  " only update the Cleopatra window if we're in normal mode
+  if mode(1) != 'n'
+    return
+  endif
   let cleopatrawinnr = bufwinnr('__Cleopatra__')
 
   if &filetype == 'cleopatra'
