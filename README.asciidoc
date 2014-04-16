@@ -7,6 +7,8 @@ NOTE: Cleopatra is currently very much underdeveloped -- we have the
 beginnings of the display window working, but none of the controls
 implemented yet.
 
+NOTE: Cleopatra depends on https://github.com/dahu/vimple[vimple]
+
 Cleopatra is a Vim plugin for managing and navigating around file
 local marks. It employs a tree-like hierarchical marks management
 philosophy that maps more intuitively to a keyboard than alphabetic
