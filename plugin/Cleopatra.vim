@@ -36,7 +36,7 @@ redir => s:ftype_out
 silent filetype
 redir END
 if s:ftype_out !~# 'detection:ON'
-  echomsg 'Cleopatra: Filetype detection is turned off, skipping plugin'
+  " echomsg 'Cleopatra: Filetype detection is turned off, skipping plugin'
   unlet s:ftype_out
   finish
 endif
@@ -136,13 +136,17 @@ function! CleoMarks(cursor_line)
 endfunction
 
 function! s:MinifyText(text)
-  if g:cleopatra_minify
-    return substitute(
-          \ substitute(a:text, '\C\<\([a-z]\)[a-z]\+', '\1', 'g'),
-          \ '\C[A-Z]\zs[a-z]\+', '', 'g')
-  else
+  let available_width = g:cleopatra_width - 10
+  let excess = available_width - len(a:text)
+  if (! g:cleopatra_minify) || (excess > 0)
     return a:text
   endif
+  let portion = available_width / len(split(a:text, '\W\+\|\s\+'))
+  let text = substitute(a:text
+        \ , '\C\<\([a-z]\{' . portion . '\}\)[a-zA-Z0-9_]\+', '\1', 'g')
+  let text = substitute(text
+        \ , '\C[A-Z]\zs[a-z0-9_]\+', '', 'g')
+  return text
 endfunction
 
 " s:CreateAutocommands() {{{2
